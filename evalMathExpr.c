@@ -51,7 +51,8 @@ double strToDouble(const char **str) {
 node *createBinaryExpressionTree(const char **expression) {
   node *operator, *actRoot, *tmp, *tmpDivision, *tmpMultiplication;
   operator = actRoot = tmp = tmpDivision = tmpMultiplication = NULL;
-  bool afterOperator = false;
+  bool afterOperator, isParenthesis;
+  afterOperator = isParenthesis = false;
   while(**expression != '\0' && **expression != ')') {
     if(**expression == '(') {
       ++(*expression);
@@ -70,6 +71,8 @@ node *createBinaryExpressionTree(const char **expression) {
       else
         operator->rNode = tmp;
       afterOperator = false;
+      if(tmp->operator != VALUE && tmp->operator != UNARY_MINUS)
+        isParenthesis = true;
   /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
     } else if(**expression == '+') {
       operator = nodeConstructor(0., ADDITION);
@@ -78,12 +81,14 @@ node *createBinaryExpressionTree(const char **expression) {
       tmpDivision = NULL;
       tmpMultiplication = NULL;
       afterOperator = true;
+      isParenthesis = false;
     } else if(**expression == '-') {
       if(actRoot == NULL || afterOperator == true) {
         if(actRoot == NULL)
           actRoot = nodeConstructor(0., UNARY_MINUS);
         else
           operator->rNode = nodeConstructor(0., UNARY_MINUS);
+        afterOperator = false;
       } else {
         operator = nodeConstructor(0., SUBTRACTION);
         operator->lNode = actRoot;
@@ -92,11 +97,53 @@ node *createBinaryExpressionTree(const char **expression) {
         tmpMultiplication = NULL;
         afterOperator = true;
       }
+      isParenthesis = false;
     } else if(**expression == '*') {
       if(operator == NULL) {
         operator = nodeConstructor(0., MULTIPLICATION);
         operator->lNode = actRoot;
         actRoot = operator;
+  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
+      } else if(isParenthesis == true) {
+        if(operator != NULL /* && operator->rNode != NULL */
+           && operator->operator == DIVISION) {
+          if(actRoot == operator) {
+            tmp = nodeConstructor(0., MULTIPLICATION);
+            tmp->lNode = operator;
+            actRoot = operator = tmp;
+          } else {
+            if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
+              tmp = nodeConstructor(0., DIVISION);
+              tmp->lNode = operator;
+              tmpDivision->rNode = tmp;
+              operator = tmp;
+            } else {          /* when "penultimate" operation was '+' or '-'  */
+              tmp = nodeConstructor(0., DIVISION);
+              tmp->lNode = operator;
+              actRoot->rNode = tmp;
+              tmpMultiplication = actRoot;
+              operator = tmp;
+            }
+          }
+        } else if(operator != NULL && operator->rNode != NULL
+           && operator->rNode->operator != DIVISION) {
+          tmp = nodeConstructor(0., MULTIPLICATION);
+          tmp->lNode = operator->rNode;
+          operator = operator->rNode = tmp;
+        } else if(operator == NULL) {
+          tmp = nodeConstructor(0., MULTIPLICATION);
+          tmp->lNode = actRoot;
+          actRoot = operator = tmp;
+        } else if(operator->rNode == NULL) {  /* is it even possible? */
+          ;
+        } else if(operator->rNode->operator == DIVISION) {
+          tmp = nodeConstructor(0., MULTIPLICATION);
+          tmp->lNode = operator->rNode;
+          operator = operator->rNode = tmp;
+        }
+        isParenthesis = false;
+        tmpDivision = NULL;
+        tmpMultiplication = NULL;
   /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
       } else if(operator->operator == DIVISION) {
         tmp = nodeConstructor(0., MULTIPLICATION);
@@ -115,6 +162,7 @@ node *createBinaryExpressionTree(const char **expression) {
         tmpMultiplication = operator;
       }
       afterOperator = true;
+      isParenthesis = false;
     } else if(**expression == '/') {
       /* division is only "left"-associative operation:  (4/2)/2  =/=  4/(2/2) */
       /* and we have to "watch out" for expressions: 4/5/6/7 */
@@ -124,12 +172,40 @@ node *createBinaryExpressionTree(const char **expression) {
         operator->lNode = actRoot;
         actRoot = operator;
   /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
+      } else if(isParenthesis == true) {
+        if(operator->operator == DIVISION) {
+          if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
+            tmp = nodeConstructor(0., DIVISION);
+            tmp->lNode = operator;
+            tmpDivision->rNode = tmp;
+            operator = tmp;
+          } else {          /* when "penultimate" operation was '+' or '-'  */
+            tmp = nodeConstructor(0., DIVISION);
+            tmp->lNode = operator;
+            actRoot->rNode = tmp;
+            tmpMultiplication = actRoot;
+            operator = tmp;
+          }
+        } else {
+          tmp = nodeConstructor(0., DIVISION);
+          tmp->lNode = operator->rNode;
+          operator->rNode = tmp;
+          tmpDivision = operator;
+          tmpMultiplication = operator;
+          operator = tmp;
+        }
+        isParenthesis = false;
+  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
       } else if(operator->operator == MULTIPLICATION) {  /* when the last operation was '*' */
         tmp = nodeConstructor(0., DIVISION);
-        tmp->lNode = operator->rNode;
+        /*tmp->lNode = operator->rNode;
         operator->rNode = tmp;
         tmpDivision = operator;
         tmpMultiplication = operator;
+        operator = tmp;*/
+        tmp->lNode = operator;
+        if(actRoot == operator)
+          actRoot = tmp;
         operator = tmp;
       } else if(operator->operator == DIVISION) {
         if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
@@ -152,6 +228,7 @@ node *createBinaryExpressionTree(const char **expression) {
         operator = tmp;
       }
       afterOperator = true;
+      isParenthesis = false;
     } else if(**expression >= '0' && **expression <= '9') {
       if(actRoot == NULL) {
         actRoot = nodeConstructor(strToDouble(expression), VALUE);
@@ -164,6 +241,7 @@ node *createBinaryExpressionTree(const char **expression) {
           operator->rNode = nodeConstructor(strToDouble(expression), VALUE);
       }
       afterOperator = false;
+      isParenthesis = false;
     }
     if(**expression != '\0')
       ++(*expression);
@@ -237,5 +315,5 @@ int main(int argc, char *argv[]) {
   for(int i = 0; i < 10; i++)
     assert(calculate(expr[i]) == result[i]);
 */
-  assert(calculate("((5.42+6.01)/( -3.05)*7.06- -0.59)") == -25.8676393442622938);
+  assert(calculate("2.01*6.51/ 8.43") == 2.01*6.51/ 8.43);
 }
