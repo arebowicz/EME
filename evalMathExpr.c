@@ -1,4 +1,6 @@
 /* https://www.codewars.com/kata/52a78825cdfc2cfc87000005/ */
+/* [UNFINISHED] */
+/* TESTS PASSED: 68 */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -49,193 +51,111 @@ double strToDouble(const char **str) {
 }
 
 node *createBinaryExpressionTree(const char **expression) {
-  node *operator, *actRoot, *tmp, *tmpDivision, *tmpMultiplication;
-  operator = actRoot = tmp = tmpDivision = tmpMultiplication = NULL;
-  bool afterOperator, isParenthesis;
+  node *operator, *actualRoot, *tmp, *parent;
+  operator = actualRoot = tmp = parent = NULL;
+  bool afterOperator, isParenthesis, isOperatorParenthesis;
   afterOperator = isParenthesis = false;
   while(**expression != '\0' && **expression != ')') {
     if(**expression == '(') {
       ++(*expression);
       tmp = createBinaryExpressionTree(expression);
-      if(actRoot == NULL) {
-        actRoot = tmp;
+      if(actualRoot == NULL) {
+        actualRoot = tmp;
         if(tmp->lNode != NULL && tmp->rNode != NULL) {
           if(tmp->operator != UNARY_MINUS) {
-            operator = actRoot;
+            operator = actualRoot;
+            isOperatorParenthesis = true;
           }
         }
-      } else if(actRoot->lNode == NULL && actRoot->rNode == NULL) {
-        actRoot->rNode = tmp;
-      } else if(operator->rNode != NULL /* && operator->rNode->operator == UNARY_MINUS */)
+      } else if(actualRoot->lNode == NULL && actualRoot->rNode == NULL)
+        actualRoot->rNode = tmp;
+      else if(operator->rNode != NULL /* && operator->rNode->operator == UNARY_MINUS */)
         operator->rNode->rNode = tmp;
       else
         operator->rNode = tmp;
       afterOperator = false;
       if(tmp->operator != VALUE && tmp->operator != UNARY_MINUS)
         isParenthesis = true;
-  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
+  /* ^^ what about parent? ^^ */
     } else if(**expression == '+') {
       operator = nodeConstructor(0., ADDITION);
-      operator->lNode = actRoot;
-      actRoot = operator;
-      tmpDivision = NULL;
-      tmpMultiplication = NULL;
+      operator->lNode = actualRoot;
+      actualRoot = operator;
+      parent = NULL;
       afterOperator = true;
       isParenthesis = false;
     } else if(**expression == '-') {
-      if(actRoot == NULL || afterOperator == true) {
-        if(actRoot == NULL)
-          actRoot = nodeConstructor(0., UNARY_MINUS);
+      if(actualRoot == NULL || afterOperator == true) {
+        if(actualRoot == NULL)
+          actualRoot = nodeConstructor(0., UNARY_MINUS);
         else
           operator->rNode = nodeConstructor(0., UNARY_MINUS);
         afterOperator = false;
       } else {
         operator = nodeConstructor(0., SUBTRACTION);
-        operator->lNode = actRoot;
-        actRoot = operator;
-        tmpDivision = NULL;
-        tmpMultiplication = NULL;
+        operator->lNode = actualRoot;
+        actualRoot = operator;
+        parent = NULL;
         afterOperator = true;
       }
       isParenthesis = false;
-    } else if(**expression == '*') {
-      if(operator == NULL) {
-        operator = nodeConstructor(0., MULTIPLICATION);
-        operator->lNode = actRoot;
-        actRoot = operator;
-  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
-      } else if(isParenthesis == true) {
-        if(operator != NULL /* && operator->rNode != NULL */
-           && operator->operator == DIVISION) {
-          if(actRoot == operator) {
-            tmp = nodeConstructor(0., MULTIPLICATION);
-            tmp->lNode = operator;
-            actRoot = operator = tmp;
-          } else {
-            if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
-              tmp = nodeConstructor(0., DIVISION);
-              tmp->lNode = operator;
-              tmpDivision->rNode = tmp;
-              operator = tmp;
-            } else {          /* when "penultimate" operation was '+' or '-'  */
-              tmp = nodeConstructor(0., DIVISION);
-              tmp->lNode = operator;
-              actRoot->rNode = tmp;
-              tmpMultiplication = actRoot;
-              operator = tmp;
-            }
-          }
-        } else if(operator != NULL && operator->rNode != NULL
-           && operator->rNode->operator != DIVISION) {
-          tmp = nodeConstructor(0., MULTIPLICATION);
-          tmp->lNode = operator->rNode;
-          operator = operator->rNode = tmp;
-        } else if(operator == NULL) {
-          tmp = nodeConstructor(0., MULTIPLICATION);
-          tmp->lNode = actRoot;
-          actRoot = operator = tmp;
-        } else if(operator->rNode == NULL) {  /* is it even possible? */
-          ;
-        } else if(operator->rNode->operator == DIVISION) {
-          tmp = nodeConstructor(0., MULTIPLICATION);
-          tmp->lNode = operator->rNode;
-          operator = operator->rNode = tmp;
-        }
-        isParenthesis = false;
-        tmpDivision = NULL;
-        tmpMultiplication = NULL;
-  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
-      } else if(operator->operator == DIVISION) {
-        tmp = nodeConstructor(0., MULTIPLICATION);
-        tmp->lNode = operator;
-        if(tmpMultiplication == NULL)
-          actRoot = tmp;
-        else
-          tmpMultiplication->rNode = tmp;
-        operator = tmp;
-      } else {
-        tmp = operator;
-        operator = nodeConstructor(0., MULTIPLICATION);
-        operator->lNode = tmp->rNode;
-        tmp->rNode = operator;
-        tmpDivision = NULL;
-        tmpMultiplication = operator;
-      }
-      afterOperator = true;
-      isParenthesis = false;
-    } else if(**expression == '/') {
+    } else if(**expression == '*' || **expression == '/') {
       /* division is only "left"-associative operation:  (4/2)/2  =/=  4/(2/2) */
       /* and we have to "watch out" for expressions: 4/5/6/7 */
-      /* also, in this algorithm: 3*4/5 == 3*(4/5) */
+      /* also, in this algorithm: 3*4/5 == (3*4)/5 */
       if(operator == NULL) {
-        operator = nodeConstructor(0., DIVISION);
-        operator->lNode = actRoot;
-        actRoot = operator;
-  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
+        operator = nodeConstructor(0., (**expression == '*') ? MULTIPLICATION : DIVISION);
+        operator->lNode = actualRoot;
+        actualRoot = operator;
       } else if(isParenthesis == true) {
-        if(operator->operator == DIVISION) {
-          if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
-            tmp = nodeConstructor(0., DIVISION);
+        if(operator->operator == ADDITION
+           || operator->operator == SUBTRACTION) {
+          tmp = nodeConstructor(0., (**expression == '*') ? MULTIPLICATION : DIVISION);
+          if(isOperatorParenthesis == true) {
             tmp->lNode = operator;
-            tmpDivision->rNode = tmp;
-            operator = tmp;
-          } else {          /* when "penultimate" operation was '+' or '-'  */
-            tmp = nodeConstructor(0., DIVISION);
-            tmp->lNode = operator;
-            actRoot->rNode = tmp;
-            tmpMultiplication = actRoot;
+            actualRoot = operator = tmp;
+            isOperatorParenthesis = false;
+          } else {
+            tmp->lNode = operator->rNode;
+            operator->rNode = tmp;
+            parent = operator;
             operator = tmp;
           }
         } else {
-          tmp = nodeConstructor(0., DIVISION);
-          tmp->lNode = operator->rNode;
-          operator->rNode = tmp;
-          tmpDivision = operator;
-          tmpMultiplication = operator;
+          tmp = nodeConstructor(0., (**expression == '*') ? MULTIPLICATION : DIVISION);
+          tmp->lNode = operator;
+          if(parent != NULL)
+            parent->rNode = tmp;
+          else
+            actualRoot = tmp;
           operator = tmp;
         }
-        isParenthesis = false;
-  /* ^^ what about tmpDivision and tmpMultiplication? ^^ */
-      } else if(operator->operator == MULTIPLICATION) {  /* when the last operation was '*' */
-        tmp = nodeConstructor(0., DIVISION);
-        /*tmp->lNode = operator->rNode;
-        operator->rNode = tmp;
-        tmpDivision = operator;
-        tmpMultiplication = operator;
-        operator = tmp;*/
+      } else if(operator->operator == ADDITION
+                || operator->operator == SUBTRACTION) {
+        tmp = operator;
+        operator = nodeConstructor(0., (**expression == '*') ? MULTIPLICATION : DIVISION);
+        operator->lNode = tmp->rNode;
+        tmp->rNode = operator;
+        parent = tmp;
+      } else if(operator->operator == MULTIPLICATION
+                || operator->operator == DIVISION) {
+        tmp = nodeConstructor(0., (**expression == '*') ? MULTIPLICATION : DIVISION);
         tmp->lNode = operator;
-        if(actRoot == operator)
-          actRoot = tmp;
-        operator = tmp;
-      } else if(operator->operator == DIVISION) {
-        if(tmpDivision != NULL) {    /* when "penultimate" operation was '*'  */
-          tmp = nodeConstructor(0., DIVISION);
-          tmp->lNode = operator;
-          tmpDivision->rNode = tmp;
-          operator = tmp;
-        } else {          /* when "penultimate" operation was '+' or '-'  */
-          tmp = nodeConstructor(0., DIVISION);
-          tmp->lNode = operator;
-          actRoot->rNode = tmp;
-          tmpMultiplication = actRoot;
-          operator = tmp;
-        }
-      } else {
-        tmp = nodeConstructor(0., DIVISION);
-        tmp->lNode = operator->rNode;
-        operator->rNode = tmp;
-        tmpMultiplication = operator;
+        if(parent != NULL)
+          parent->rNode = tmp;
+        else if(actualRoot == operator)
+          actualRoot = tmp;
         operator = tmp;
       }
       afterOperator = true;
       isParenthesis = false;
-    } else if(**expression >= '0' && **expression <= '9') {
-      if(actRoot == NULL) {
-        actRoot = nodeConstructor(strToDouble(expression), VALUE);
+    } else if(**expression >= '0' && **expression <= '9') { /* get VALUE from expression */
+      if(actualRoot == NULL) {    /* first value */
+        actualRoot = nodeConstructor(strToDouble(expression), VALUE);
       } else {
-        if(actRoot->lNode == NULL && actRoot->rNode == NULL) {
-          actRoot->rNode = nodeConstructor(strToDouble(expression), VALUE);
-        } else if(operator->rNode != NULL /* && operator->rNode->operator == UNARY_MINUS */)
+        if(actualRoot->lNode == NULL && actualRoot->rNode == NULL) {  /* UNARY_MINUS */
+          actualRoot->rNode = nodeConstructor(strToDouble(expression), VALUE);
+        } else if(operator->rNode != NULL /* && operator->rNode->operator == UNARY_MINUS */)  /* UNARY_MINUS */
           operator->rNode->rNode = nodeConstructor(strToDouble(expression), VALUE);
         else
           operator->rNode = nodeConstructor(strToDouble(expression), VALUE);
@@ -243,10 +163,9 @@ node *createBinaryExpressionTree(const char **expression) {
       afterOperator = false;
       isParenthesis = false;
     }
-    if(**expression != '\0')
-      ++(*expression);
+    ++(*expression);
   }
-  return actRoot;
+  return actualRoot;
 }
 
 double evalTree(node *n) {
@@ -315,5 +234,5 @@ int main(int argc, char *argv[]) {
   for(int i = 0; i < 10; i++)
     assert(calculate(expr[i]) == result[i]);
 */
-  assert(calculate("2.01*6.51/ 8.43") == 2.01*6.51/ 8.43);
+  assert(calculate("(123.45*(678.90 / (-2.5+ 11.5)-(80 -19) *33.25) / 20 + 11)") == (123.45*(678.90 / (-2.5+ 11.5)-(80 -19) *33.25) / 20 + 11));
 }
